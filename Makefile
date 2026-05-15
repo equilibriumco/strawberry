@@ -20,6 +20,10 @@ endif
 BANDERSNATCH_LIB = libbandersnatch.$(LIB_EXT)
 ERASURECODING_LIB = liberasurecoding.$(LIB_EXT)
 
+# Strip debug symbols and DWARF tables from release binaries.
+# Override with `make build LDFLAGS=...` if you need symbols for debugging.
+LDFLAGS ?= -s -w
+
 all: help
 
 .PHONY: help
@@ -80,13 +84,19 @@ install-hooks:
 
 .PHONY: build
 build: build-bandersnatch build-erasurecoding
-	GOOS=${GOOS} GOARCH=${GOARCH} go build -o strawberry ./cmd/strawberry
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags="$(LDFLAGS)" -o strawberry ./cmd/strawberry
 
 .PHONY: build-conformance
-## build-conformance: Builds the conformance tool
+## build-conformance: Builds the conformance tool with the tiny spec
 build-conformance: build-bandersnatch build-erasurecoding
 	mkdir -p pkg/conformance/bin
-	go build -tags="tiny" -o pkg/conformance/bin/strawberry ./pkg/conformance/cmd/main.go
+	go build -tags="tiny" -ldflags="$(LDFLAGS)" -o pkg/conformance/bin/strawberry ./pkg/conformance/cmd/main.go
+
+.PHONY: build-conformance-full
+## build-conformance-full: Builds the conformance tool with the full spec
+build-conformance-full: build-bandersnatch build-erasurecoding
+	mkdir -p pkg/conformance/bin
+	go build -ldflags="$(LDFLAGS)" -o pkg/conformance/bin/strawberry-full ./pkg/conformance/cmd/main.go
 
 .PHONY: test-conformance
 ## test-conformance: Runs conformance tests

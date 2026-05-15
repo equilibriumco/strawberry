@@ -68,6 +68,50 @@ This returns:
 ```
 Meaning that the block is being validated.
 
+## Docker
+
+A single `linux/amd64` image runs in two modes, selected by the `JAM_FUZZ`
+environment variable. The image follows the [JAM standard target packaging
+spec](https://github.com/davxy/jam-conformance/tree/main/fuzz-proto#standard-target-packaging).
+
+Build:
+
+```bash
+docker build -t strawberry .
+```
+
+**Normal mode** — validator node listening on UDP 30000 with baked-in dev configs:
+
+```bash
+docker run --rm -p 30000:30000/udp strawberry
+```
+
+To use your own keys/config, mount over the baked-in files:
+
+```bash
+docker run --rm -p 30000:30000/udp \
+    -v "$PWD/appconfig.json:/app/appconfig.json:ro" \
+    -v "$PWD/test_validators.json:/app/test_validators.json:ro" \
+    strawberry
+```
+
+**Fuzz mode** — JAM conformance target speaking the fuzz protocol over a Unix socket:
+
+```bash
+docker run --rm \
+    -e JAM_FUZZ=1 \
+    -e JAM_FUZZ_SPEC=tiny \
+    -e JAM_FUZZ_DATA_PATH=/tmp/jam/data \
+    -e JAM_FUZZ_SOCK_PATH=/tmp/jam/fuzz.sock \
+    -e JAM_FUZZ_LOG_LEVEL=info \
+    -v /tmp/jam:/tmp/jam \
+    strawberry
+```
+
+`JAM_FUZZ_SPEC` accepts `tiny` or `full`.
+
+> The image bakes a freshly-generated ed25519 keypair for local dev. **Do not use it in production** — generate your own `test_validators.json`.
+
 ## Run tests
 
 ### Unit tests

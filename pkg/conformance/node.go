@@ -33,6 +33,11 @@ const (
 	FeatureReserved        Features = 2147483648
 )
 
+// errCloseSession signals that the connection must be closed without sending
+// a response. Used for protocol violations the fuzz spec says should drop the
+// session (e.g. a second Initialize within one session).
+var errCloseSession = errors.New("close session")
+
 // Node is a conformance testing node complying with fuzzer protocol https://github.com/davxy/jam-stuff/tree/main/fuzz-proto
 // opens a connection via a unix socket and listens to fuzzer messages and updates the state accordingly
 type Node struct {
@@ -147,6 +152,10 @@ func (n *Node) handleConnection(conn net.Conn) {
 		}
 
 		responseMsg, err := n.messageHandler(msg)
+		if errors.Is(err, errCloseSession) {
+			log.Printf("closing session: %v", err)
+			return
+		}
 		if err != nil {
 			responseMsg = NewMessage(Error{Message: []byte(fmt.Sprintf("Chain error: %s", err.Error()))})
 		}
@@ -185,6 +194,9 @@ func (n *Node) messageHandler(msg *Message) (*Message, error) {
 	}
 	switch choice := msg.Get().(type) {
 	case Initialize:
+		if n.mainChainHead != nil {
+			return nil, fmt.Errorf("%w: second Initialize received within session", errCloseSession)
+		}
 		// Initialize state
 		state, err := deserializeState(choice.State.StateItems)
 		if err != nil {

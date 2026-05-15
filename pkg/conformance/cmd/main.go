@@ -5,18 +5,33 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
 	"github.com/eigerco/strawberry/pkg/conformance"
+	pkglog "github.com/eigerco/strawberry/pkg/log"
 )
 
 func main() {
-	socketPath := flag.String("socket", "/tmp/jam_target.sock", "Path to the socket for the fuzzer to connect to")
+	defaultSocket := "/tmp/jam_target.sock"
+	if v := os.Getenv("JAM_FUZZ_SOCK_PATH"); v != "" {
+		defaultSocket = v
+	}
+
+	socketPath := flag.String("socket", defaultSocket, "Path to the socket for the fuzzer to connect to (overrides JAM_FUZZ_SOCK_PATH)")
 	pprofAddr := flag.String("pprof", "", "Address for pprof HTTP server (e.g., localhost:6060)")
 	flag.Parse()
 
 	// Ensure no extra positional arguments
 	if flag.NArg() > 0 {
 		log.Fatalf("unexpected arguments: %v", flag.Args())
+	}
+
+	if lvl := os.Getenv("JAM_FUZZ_LOG_LEVEL"); lvl != "" {
+		parsed, err := pkglog.ParseLogLevel(lvl)
+		if err != nil {
+			log.Fatalf("invalid JAM_FUZZ_LOG_LEVEL %q: %v", lvl, err)
+		}
+		pkglog.Init(pkglog.Options{LogLevel: parsed})
 	}
 
 	// Start pprof server if address provided
